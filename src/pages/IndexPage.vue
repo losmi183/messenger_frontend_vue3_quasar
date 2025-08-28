@@ -19,7 +19,7 @@ import { api } from "boot/axios";
 
 function testToken() {
   api
-    .post("/auth/whoami")
+    .get("/auth/whoami")
     .then((response) => {
       console.log(response);
     })

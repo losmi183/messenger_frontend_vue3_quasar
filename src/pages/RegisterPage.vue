@@ -1,7 +1,6 @@
 <template>
   <q-page class="flex flex-center">
-    <FullScreenLoader :show="loading" />
-    <q-form @submit.prevent="submitLogin" style="width: 350px">
+    <q-form @submit.prevent="submitRegister" style="width: 350px">
       <q-input
         filled
         v-model="email"
@@ -22,7 +21,7 @@
         required
       />
       <q-btn
-        label="Login"
+        label="Register"
         type="submit"
         color="primary"
         class="full-width q-mt-md"
@@ -36,7 +35,6 @@ import { ref } from "vue";
 import axios from "axios";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "stores/auth";
-import FullScreenLoader from "components/FullScreenLoader.vue";
 
 const email = ref("");
 const password = ref("");
@@ -44,15 +42,13 @@ const emailError = ref("");
 const passwordError = ref("");
 const router = useRouter();
 const authStore = useAuthStore();
-const loading = ref(false);
 
 function isValidEmail(value) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(value);
 }
 
-function submitLogin() {
-  loading.value = true;
+function submitRegister() {
   emailError.value = "";
   passwordError.value = "";
 
@@ -67,15 +63,12 @@ function submitLogin() {
   }
 
   authStore
-    .login(email.value, password.value)
+    .Register(email.value, password.value)
     .then(() => {
       router.push("/");
     })
     .catch((err) => {
-      passwordError.value = err || "Login error";
-    })
-    .finally(() => {
-      loading.value = false;
+      passwordError.value = err || "Register error";
     });
 }
 </script>

@@ -2,16 +2,41 @@ const routes = [
   {
     path: "/",
     component: () => import("layouts/MainLayout.vue"),
+    meta: { requiresAuth: true },
     children: [{ path: "", component: () => import("pages/IndexPage.vue") }],
   },
   {
     path: "/login",
-    component: () => import("layouts/MainLayout.vue"),
+    component: () => import("layouts/GuestLayout.vue"),
+    meta: { guest: true },
     children: [{ path: "", component: () => import("pages/LoginPage.vue") }],
   },
+  {
+    path: "/register",
+    component: () => import("layouts/AuthLayout.vue"),
+    meta: { guest: true },
+    children: [{ path: "", component: () => import("pages/RegisterPage.vue") }],
+  },
 
-  // Always leave this as last one,
-  // but you can also remove it
+  {
+    path: "/conversation/:friendId/:friendName",
+    component: () => import("layouts/MainLayout.vue"),
+    children: [
+      { path: "", component: () => import("pages/ConversationPage.vue") },
+    ],
+  },
+
+  {
+    path: "/message",
+    component: () => import("layouts/MainLayout.vue"),
+    children: [{ path: "", component: () => import("pages/MessagePage.vue") }],
+  },
+  {
+    path: "/msg",
+    component: () => import("layouts/MainLayout.vue"),
+    children: [{ path: "", component: () => import("pages/MsgPage.vue") }],
+  },
+
   {
     path: "/:catchAll(.*)*",
     component: () => import("pages/ErrorNotFound.vue"),
