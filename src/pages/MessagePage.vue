@@ -1,6 +1,9 @@
 <template>
   <q-page class="q-pa-md">
-    <h3>Poruke za User 1</h3>
+    <h3 v-if="authStore.user">
+      Poruke za {{ authStore.user.name }} (ID: {{ authStore.user.id }})
+    </h3>
+    <h3 v-else>Učitava se...</h3>
 
     <div v-if="messages.length === 0">Nema poruka...</div>
 
@@ -10,34 +13,45 @@
       class="q-mb-md q-pa-md"
       style="border: 1px solid #ccc"
     >
-      <div><strong>Od:</strong> {{ message.from }}</div>
+      <div><strong>Od:</strong> {{ message.from.name }}</div>
       <div><strong>Poruka:</strong> {{ message.message }}</div>
     </div>
   </q-page>
 </template>
 
 <script>
-import { defineComponent, ref, onMounted, onUnmounted } from "vue";
+import { defineComponent, ref, onMounted, onUnmounted, computed } from "vue";
+import { useAuthStore } from "stores/auth";
 
 export default defineComponent({
   name: "MessagePage",
 
   setup() {
+    const authStore = useAuthStore();
     const messages = ref([]);
     let pusher = null;
 
-    const initPusher = () => {
-      // Hardkodovano za user 1
-      const userId = 1;
+    const userId = computed(() => authStore.user?.id);
 
-      pusher = new window.Pusher("d842d9bd852a8bbc74b0", {
-        cluster: "eu",
-        authEndpoint: "http://messenger.test/api/pusher/auth",
+    const initPusher = () => {
+      if (!userId.value) {
+        console.log("User ID not available yet");
+        return;
+      }
+
+      pusher = new window.Pusher(import.meta.env.VITE_PUSHER_KEY, {
+        cluster: import.meta.env.VITE_PUSHER_CLUSTER,
+        authEndpoint: `${import.meta.env.VITE_API_URL}/api/pusher/auth`,
+        auth: {
+          headers: {
+            Authorization: `Bearer ${authStore.token}`,
+          },
+        },
       });
 
-      const channel = pusher.subscribe(`private-user-${userId}`);
+      const channel = pusher.subscribe(`private-user-${userId.value}`);
 
-      channel.bind("my-event", (data) => {
+      channel.bind("message.sent", (data) => {
         console.log("Received message:", data);
 
         // Dodaj poruku na vrh liste
@@ -48,7 +62,12 @@ export default defineComponent({
       });
     };
 
-    onMounted(() => {
+    onMounted(async () => {
+      // Prvo restore session ako nije već učitan user
+      if (!authStore.user && authStore.token) {
+        await authStore.restoreSession();
+      }
+
       if (!window.Pusher) {
         const script = document.createElement("script");
         script.src = "https://js.pusher.com/8.4.0/pusher.min.js";
@@ -69,6 +88,7 @@ export default defineComponent({
 
     return {
       messages,
+      authStore,
     };
   },
 });
