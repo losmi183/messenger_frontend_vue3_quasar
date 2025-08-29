@@ -146,11 +146,16 @@ function initPusher() {
 
   channel = pusher.subscribe(`private-user-${userId.value}`);
   channel.bind("message.sent", (data) => {
-    messages.value.push({
-      id: Date.now(),
-      ...data,
-    });
-    scrollToBottom();
+    debugger;
+    const isFromCurrentFriend = data.from.id === parseInt(friendId.value);
+
+    if (isFromCurrentFriend) {
+      messages.value.push({
+        id: Date.now(),
+        ...data,
+      });
+      scrollToBottom();
+    }
   });
 }
 

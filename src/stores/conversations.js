@@ -3,107 +3,68 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 
 export const useConversationsStore = defineStore("conversations", () => {
-  // State
+  // State - organizuje poruke po user ID-u
   const conversations = ref({});
 
   // Getters
-  const getConversation = computed(() => {
-    return (userId) => {
-      return (
-        conversations.value[userId] || {
-          messages: [],
-          unreadCount: 0,
-          lastMessageAt: null,
-          participant: null,
-        }
-      );
-    };
-  });
-
   const getMessagesForUser = computed(() => {
     return (userId) => {
-      return conversations.value[userId]?.messages || [];
+      return conversations.value[userId] || [];
     };
   });
 
   const getUnreadCount = computed(() => {
     return (userId) => {
-      return conversations.value[userId]?.unreadCount || 0;
+      // Broji poruke koje nisu od trenutnog korisnika i nisu označene kao pročitane
+      const messages = conversations.value[userId] || [];
+      return messages.filter(
+        (msg) => !msg.isRead && msg.sender_id !== getCurrentUserId()
+      ).length;
     };
   });
 
   const getAllConversations = computed(() => {
-    return Object.entries(conversations.value).map(
-      ([userId, conversation]) => ({
-        userId,
-        ...conversation,
-      })
-    );
+    return Object.keys(conversations.value).map((userId) => ({
+      userId,
+      messages: conversations.value[userId],
+      lastMessage: conversations.value[userId]?.slice(-1)[0] || null,
+    }));
   });
 
+  // Helper function - treba da se proslijedi iz auth store-a
+  function getCurrentUserId() {
+    // Ovo će biti prosliješeno iz komponente
+    return window._currentUserId || null;
+  }
+
   // Actions
-  function initializeConversation(userId, participant = null) {
+  function setMessagesForUser(userId, messages) {
+    // Postavlja sve poruke za korisnika (koristi se za učitavanje sa API-ja)
+    conversations.value[userId] = [...messages];
+  }
+
+  function addMessageToUser(userId, message) {
+    // Dodaje jednu poruku za korisnika
     if (!conversations.value[userId]) {
-      conversations.value[userId] = {
-        messages: [],
-        unreadCount: 0,
-        lastMessageAt: null,
-        participant: participant,
-      };
+      conversations.value[userId] = [];
+    }
+
+    // Provjeri da poruka već ne postoji (da izbegne duplikate)
+    const exists = conversations.value[userId].find(
+      (msg) => msg.id === message.id
+    );
+    if (!exists) {
+      conversations.value[userId].push(message);
     }
   }
 
-  function addMessage(userId, message) {
-    // Ensure conversation exists
-    initializeConversation(userId);
-
-    // Create message with required fields
-    const newMessage = {
-      id: message.id || Date.now(),
-      content: message.content,
-      timestamp: message.timestamp || new Date().toISOString(),
-      fromMe: message.fromMe || false,
-      fromUser: message.fromUser || null,
-      ...message, // spread any additional properties
-    };
-
-    // Add message to conversation
-    conversations.value[userId].messages.push(newMessage);
-    conversations.value[userId].lastMessageAt = newMessage.timestamp;
-
-    // Increment unread count if message is not from current user
-    if (!newMessage.fromMe) {
-      conversations.value[userId].unreadCount++;
-    }
-  }
-
-  function markAsRead(userId) {
+  function markUserMessagesAsRead(userId, currentUserId) {
+    // Označava sve poruke od datog korisnika kao pročitane
     if (conversations.value[userId]) {
-      conversations.value[userId].unreadCount = 0;
-    }
-  }
-
-  function sendMessage(userId, content) {
-    const message = {
-      content,
-      fromMe: true,
-      timestamp: new Date().toISOString(),
-    };
-
-    addMessage(userId, message);
-
-    // Here you would typically also send to your backend/pusher
-    // Example:
-    // window.Echo.private(`private-channel-${userId}`)
-    //   .whisper('new-message', message)
-
-    return message;
-  }
-
-  function clearConversation(userId) {
-    if (conversations.value[userId]) {
-      conversations.value[userId].messages = [];
-      conversations.value[userId].unreadCount = 0;
+      conversations.value[userId] = conversations.value[userId].map((msg) => ({
+        ...msg,
+        isRead: msg.sender_id !== currentUserId ? true : msg.isRead,
+      }));
     }
   }
 
@@ -111,18 +72,8 @@ export const useConversationsStore = defineStore("conversations", () => {
     delete conversations.value[userId];
   }
 
-  function updateParticipant(userId, participant) {
-    initializeConversation(userId);
-    conversations.value[userId].participant = participant;
-  }
-
-  // Utility function for handling Pusher messages
-  function handlePusherMessage(userId, messageData) {
-    const message = {
-      ...messageData,
-      fromMe: false,
-    };
-    addMessage(userId, message);
+  function clearAllConversations() {
+    conversations.value = {};
   }
 
   return {
@@ -130,19 +81,15 @@ export const useConversationsStore = defineStore("conversations", () => {
     conversations,
 
     // Getters
-    getConversation,
     getMessagesForUser,
     getUnreadCount,
     getAllConversations,
 
     // Actions
-    initializeConversation,
-    addMessage,
-    markAsRead,
-    sendMessage,
-    clearConversation,
+    setMessagesForUser,
+    addMessageToUser,
+    markUserMessagesAsRead,
     removeConversation,
-    updateParticipant,
-    handlePusherMessage,
+    clearAllConversations,
   };
 });
