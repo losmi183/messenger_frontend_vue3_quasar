@@ -11,7 +11,7 @@
           @click="toggleLeftDrawer"
         />
 
-        <q-toolbar-title> Crypted messenger </q-toolbar-title>
+        <q-toolbar-title> {{ auth?.user?.name }} </q-toolbar-title>
 
         <q-btn
           v-if="auth.user"

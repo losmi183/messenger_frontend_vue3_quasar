@@ -1,17 +1,20 @@
 <template>
-  <q-page class="q-pa-md">
+  <q-page class="chat-page">
     <FullScreenLoader :show="loading" />
 
-    <div class="text-h6 q-mb-md">Conversation with: {{ friendName }}</div>
+    <!-- Header -->
+    <div class="chat-header q-pa-md">
+      <div class="text-h6">Conversation with: {{ friendName }}</div>
+    </div>
 
-    <div ref="chatWindow" class="chat-window q-pa-sm column scroll">
+    <!-- Chat prozor sa fiksnom visinom -->
+    <div ref="chatWindow" class="chat-window q-pa-sm">
       <div
         v-for="msg in messages"
         :key="msg.id"
         class="q-mb-md"
         :class="msg.sender_id === userId ? 'sent' : 'received'"
       >
-        <!-- Header: ko i vreme -->
         <div class="text-caption text-grey">
           <strong>{{
             msg.sender_id === userId ? "You" : msg.sender_name
@@ -19,11 +22,32 @@
           •
           {{ formatDate(msg.created_at) }}
         </div>
-
-        <!-- Sadržaj poruke -->
         <div class="message-bubble">
           {{ msg.message }}
         </div>
+      </div>
+    </div>
+
+    <!-- Input fiksiran na dnu -->
+    <div class="chat-input q-pa-md">
+      <div class="row items-center">
+        <q-input
+          v-model="newMessage"
+          outlined
+          dense
+          class="col-grow q-mr-sm"
+          placeholder="Type a message..."
+          :disable="sending"
+          @keyup.enter="sendMessage"
+        />
+        <q-btn
+          color="primary"
+          icon="send"
+          round
+          dense
+          :disable="sending"
+          @click="sendMessage"
+        />
       </div>
     </div>
   </q-page>
@@ -34,40 +58,82 @@ import { useRoute } from "vue-router";
 import { ref, onMounted, watch, onUnmounted, nextTick, computed } from "vue";
 import { api } from "boot/axios";
 import FullScreenLoader from "components/FullScreenLoader.vue";
-import { useAuthStore } from "stores/auth"; // Pinia store
+import { useAuthStore } from "stores/auth";
 
 const route = useRoute();
 const friendId = ref(route.params.friendId);
 const friendName = ref(route.params.friendName);
 const messages = ref([]);
 const chatWindow = ref(null);
+const newMessage = ref("");
+const loading = ref(false);
+const sending = ref(false);
 
-const authStore = useAuthStore(); // Pinia store instanca
-
+const authStore = useAuthStore();
 const userId = computed(() => authStore.getUser?.id);
 const token = computed(() => authStore.token);
-const loading = ref(false);
 
 let pusher = null;
 let channel = null;
 
-function loadMessages() {
+// Funkcija za skrolovanje dole
+function scrollToBottom() {
+  nextTick(() => {
+    if (chatWindow.value) {
+      chatWindow.value.scrollTop = chatWindow.value.scrollHeight;
+    }
+  });
+}
+
+// učitavanje prethodnih poruka
+async function loadMessages() {
   loading.value = true;
+  try {
+    const res = await api.get(`/message/conversation/${friendId.value}`);
+    messages.value = res.data;
+    scrollToBottom();
+  } catch (err) {
+    console.error("Greška prilikom učitavanja poruka:", err);
+  } finally {
+    loading.value = false;
+  }
+}
+
+// slanje poruke
+function sendMessage() {
+  const content = newMessage.value.trim();
+  if (!content || sending.value) return;
+
+  sending.value = true;
+
   api
-    .get(`/message/conversation/${friendId.value}`)
+    .post("/message/send", {
+      recipient_id: friendId.value,
+      content: content,
+    })
     .then((res) => {
-      messages.value = res.data;
+      messages.value.push({
+        id: res.data.id || Date.now(),
+        sender_id: userId.value,
+        sender_name: authStore.getUser.name,
+        message: content,
+        created_at: res.data.created_at || new Date().toISOString(),
+      });
+      newMessage.value = "";
       scrollToBottom();
     })
     .catch((err) => {
-      console.error("Greška prilikom učitavanja poruka:", err);
+      console.error("Greška prilikom slanja poruke:", err);
     })
     .finally(() => {
-      loading.value = false;
+      sending.value = false;
     });
 }
 
+// inicijalizacija Pusher-a
 function initPusher() {
+  if (!userId.value) return;
+
   pusher = new window.Pusher(import.meta.env.VITE_PUSHER_KEY, {
     cluster: import.meta.env.VITE_PUSHER_CLUSTER,
     authEndpoint: `${import.meta.env.VITE_API_URL}/api/pusher/auth`,
@@ -79,30 +145,21 @@ function initPusher() {
   });
 
   channel = pusher.subscribe(`private-user-${userId.value}`);
-
   channel.bind("message.sent", (data) => {
-    console.log("Nova poruka stigla:", data);
-
-    // Dodaj na kraj liste
     messages.value.push({
       id: Date.now(),
       ...data,
     });
-
     scrollToBottom();
   });
 }
 
-function scrollToBottom() {
-  nextTick(() => {
-    if (chatWindow.value) {
-      chatWindow.value.scrollTop = chatWindow.value.scrollHeight;
-    }
-  });
-}
+onMounted(async () => {
+  if (!authStore.getUser && authStore.token) {
+    await authStore.restoreSession();
+  }
 
-onMounted(() => {
-  loadMessages();
+  await loadMessages();
 
   if (!window.Pusher) {
     const script = document.createElement("script");
@@ -121,14 +178,13 @@ onUnmounted(() => {
 
 watch(
   () => route.params.friendId,
-  (newId) => {
+  async (newId) => {
     friendId.value = newId;
     friendName.value = route.params.friendName;
-    loadMessages();
+    await loadMessages();
   }
 );
 
-// Format datuma
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-US", {
@@ -140,9 +196,30 @@ function formatDate(dateStr) {
 </script>
 
 <style scoped>
+.chat-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
 .chat-window {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-input {
+  flex-shrink: 0;
+  border-top: 1px solid #e0e0e0;
+  background: white;
 }
 
 .sent {
