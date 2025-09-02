@@ -59,17 +59,18 @@ import { ref, onMounted, watch, onUnmounted, nextTick, computed } from "vue";
 import { api } from "boot/axios";
 import FullScreenLoader from "components/FullScreenLoader.vue";
 import { useAuthStore } from "stores/auth";
+import { useConversationStore } from "stores/conversations";
 
 const route = useRoute();
 const friendId = ref(route.params.friendId);
 const friendName = ref(route.params.friendName);
-const messages = ref([]);
 const chatWindow = ref(null);
 const newMessage = ref("");
 const loading = ref(false);
 const sending = ref(false);
 
 const authStore = useAuthStore();
+const conversationStore = useConversationStore();
 const userId = computed(() => authStore.getUser?.id);
 const token = computed(() => authStore.token);
 
@@ -86,18 +87,18 @@ function scrollToBottom() {
 }
 
 // učitavanje prethodnih poruka
-async function loadMessages() {
-  loading.value = true;
-  try {
-    const res = await api.get(`/message/conversation/${friendId.value}`);
-    messages.value = res.data;
-    scrollToBottom();
-  } catch (err) {
-    console.error("Greška prilikom učitavanja poruka:", err);
-  } finally {
-    loading.value = false;
-  }
-}
+// async function loadMessages() {
+//   loading.value = true;
+//   try {
+//     const res = await api.get(`/message/conversation/${friendId.value}`);
+//     messages.value = res.data;
+//     scrollToBottom();
+//   } catch (err) {
+//     console.error("Greška prilikom učitavanja poruka:", err);
+//   } finally {
+//     loading.value = false;
+//   }
+// }
 
 // slanje poruke
 function sendMessage() {
@@ -146,7 +147,6 @@ function initPusher() {
 
   channel = pusher.subscribe(`private-user-${userId.value}`);
   channel.bind("message.sent", (data) => {
-    debugger;
     const isFromCurrentFriend = data.from.id === parseInt(friendId.value);
 
     if (isFromCurrentFriend) {
@@ -161,10 +161,10 @@ function initPusher() {
 
 onMounted(async () => {
   if (!authStore.getUser && authStore.token) {
-    await authStore.restoreSession();
+    conversationStore.fetchConversations(friendId.value);
   }
 
-  await loadMessages();
+  // await loadMessages();
 
   if (!window.Pusher) {
     const script = document.createElement("script");
@@ -176,6 +176,10 @@ onMounted(async () => {
   }
 });
 
+const messages = computed(() =>
+  conversationStore.getConversation(friendId.value)
+);
+
 onUnmounted(() => {
   if (channel) channel.unsubscribe();
   if (pusher) pusher.disconnect();
@@ -183,10 +187,10 @@ onUnmounted(() => {
 
 watch(
   () => route.params.friendId,
-  async (newId) => {
+  (newId) => {
     friendId.value = newId;
     friendName.value = route.params.friendName;
-    await loadMessages();
+    conversationStore.fetchConversations(newId);
   }
 );
 
