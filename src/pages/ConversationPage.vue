@@ -11,20 +11,21 @@
     <div ref="chatWindow" class="chat-window q-pa-sm">
       <div
         v-for="msg in messages"
-        :key="msg.id"
+        :key="msg.id || msg.tempId"
         class="q-mb-md"
-        :class="msg.sender_id === userId ? 'sent' : 'received'"
+        :class="[
+          msg.sender_id === userId ? 'sent' : 'received',
+          msg.status === 'pending' ? 'pending' : '',
+        ]"
       >
         <div class="text-caption text-grey">
           <strong>{{
             msg.sender_id === userId ? "You" : msg.sender_name
           }}</strong>
-          •
-          {{ formatDate(msg.created_at) }}
+          <span v-if="msg.status === 'pending'">• Pending</span>
+          <span v-else>• {{ formatDate(msg.created_at) }}</span>
         </div>
-        <div class="message-bubble">
-          {{ msg.message }}
-        </div>
+        <div class="message-bubble">{{ msg.message }}</div>
       </div>
     </div>
 
@@ -37,17 +38,9 @@
           dense
           class="col-grow q-mr-sm"
           placeholder="Type a message..."
-          :disable="sending"
           @keyup.enter="sendMessage"
         />
-        <q-btn
-          color="primary"
-          icon="send"
-          round
-          dense
-          :disable="sending"
-          @click="sendMessage"
-        />
+        <q-btn color="primary" icon="send" round dense @click="sendMessage" />
       </div>
     </div>
   </q-page>
@@ -67,7 +60,6 @@ const friendName = ref(route.params.friendName);
 const chatWindow = ref(null);
 const newMessage = ref("");
 const loading = ref(false);
-const sending = ref(false);
 
 const authStore = useAuthStore();
 const conversationStore = useConversationStore();
@@ -89,19 +81,14 @@ function scrollToBottom() {
 // slanje poruke
 function sendMessage() {
   const content = newMessage.value.trim();
-  if (!content || sending.value) return;
+  if (!content) return;
 
-  sending.value = true;
+  newMessage.value = "";
+  scrollToBottom();
 
   conversationStore
     .sendMessage(friendId.value, content, authStore.getUser)
-    .then(() => {
-      newMessage.value = "";
-      scrollToBottom();
-    })
-    .finally(() => {
-      sending.value = false;
-    });
+    .then(() => {});
 }
 
 onMounted(() => {
@@ -123,6 +110,12 @@ watch(
     friendId.value = newId;
     friendName.value = route.params.friendName;
     conversationStore.fetchConversations(newId);
+  }
+);
+watch(
+  () => messages.value.length,
+  () => {
+    scrollToBottom();
   }
 );
 
@@ -191,5 +184,10 @@ function formatDate(dateStr) {
 .received .message-bubble {
   background: #f1f1f1;
   color: #333;
+}
+.pending .message-bubble {
+  background: #cfd8dc; /* bleda boja */
+  color: #555;
+  font-style: italic;
 }
 </style>
