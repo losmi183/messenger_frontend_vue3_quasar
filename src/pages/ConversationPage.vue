@@ -86,20 +86,6 @@ function scrollToBottom() {
   });
 }
 
-// učitavanje prethodnih poruka
-// async function loadMessages() {
-//   loading.value = true;
-//   try {
-//     const res = await api.get(`/message/conversation/${friendId.value}`);
-//     messages.value = res.data;
-//     scrollToBottom();
-//   } catch (err) {
-//     console.error("Greška prilikom učitavanja poruka:", err);
-//   } finally {
-//     loading.value = false;
-//   }
-// }
-
 // slanje poruke
 function sendMessage() {
   const content = newMessage.value.trim();
@@ -107,57 +93,16 @@ function sendMessage() {
 
   sending.value = true;
 
-  api
-    .post("/message/send", {
-      recipient_id: friendId.value,
-      content: content,
-    })
-    .then((res) => {
-      messages.value.push({
-        id: res.data.id || Date.now(),
-        sender_id: userId.value,
-        sender_name: authStore.getUser.name,
-        message: content,
-        created_at: res.data.created_at || new Date().toISOString(),
-      });
+  conversationStore
+    .sendMessage(friendId.value, content, authStore.getUser)
+    .then(() => {
       newMessage.value = "";
       scrollToBottom();
-    })
-    .catch((err) => {
-      console.error("Greška prilikom slanja poruke:", err);
     })
     .finally(() => {
       sending.value = false;
     });
 }
-
-// inicijalizacija Pusher-a
-// function initPusher() {
-//   if (!userId.value) return;
-
-//   pusher = new window.Pusher(import.meta.env.VITE_PUSHER_KEY, {
-//     cluster: import.meta.env.VITE_PUSHER_CLUSTER,
-//     authEndpoint: `${import.meta.env.VITE_API_URL}/api/pusher/auth`,
-//     auth: {
-//       headers: {
-//         Authorization: `Bearer ${token.value}`,
-//       },
-//     },
-//   });
-
-//   channel = pusher.subscribe(`private-user-${userId.value}`);
-//   channel.bind("message.sent", (data) => {
-//     const isFromCurrentFriend = data.from.id === parseInt(friendId.value);
-
-//     if (isFromCurrentFriend) {
-//       messages.value.push({
-//         id: Date.now(),
-//         ...data,
-//       });
-//       scrollToBottom();
-//     }
-//   });
-// }
 
 onMounted(() => {
   conversationStore.fetchConversations(friendId.value);

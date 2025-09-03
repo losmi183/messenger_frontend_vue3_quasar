@@ -18,6 +18,30 @@ export const useConversationStore = defineStore("conversations", {
   },
 
   actions: {
+    async sendMessage(friendId, content, user) {
+      try {
+        const res = await api.post("/message/send", {
+          recipient_id: friendId,
+          content,
+        });
+
+        const msg = {
+          id: res.data.id || Date.now(),
+          sender_id: user.id,
+          sender_name: user.name,
+          message: content,
+          created_at: res.data.created_at || new Date().toISOString(),
+        };
+
+        this.addMessage(friendId, msg);
+
+        return msg;
+      } catch (err) {
+        console.error("Greška prilikom slanja poruke", err);
+        throw err;
+      }
+    },
+
     addMessage(friendId, message) {
       if (!this.conversations[friendId]) {
         this.conversations[friendId] = [];
