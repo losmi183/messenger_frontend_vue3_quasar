@@ -21,5 +21,8 @@ export const useConnectionsStore = defineStore("connections", {
           this.loading = false;
         });
     },
+    resetStore() {
+      this.$reset();
+    },
   },
 });

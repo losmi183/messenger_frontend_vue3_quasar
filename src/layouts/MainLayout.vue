@@ -58,10 +58,12 @@ import { useAuthStore } from "stores/auth";
 import { useRouter } from "vue-router";
 import { useConnectionsStore } from "stores/connections";
 import { onMounted } from "vue";
+import { useConversationStore } from "stores/conversations";
 
 const auth = useAuthStore();
 const router = useRouter();
 const connections = useConnectionsStore();
+const conversationStore = useConversationStore();
 
 onMounted(() => {
   connections.loadConnections();

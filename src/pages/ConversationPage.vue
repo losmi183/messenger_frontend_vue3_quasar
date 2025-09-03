@@ -132,48 +132,35 @@ function sendMessage() {
 }
 
 // inicijalizacija Pusher-a
-function initPusher() {
-  if (!userId.value) return;
+// function initPusher() {
+//   if (!userId.value) return;
 
-  pusher = new window.Pusher(import.meta.env.VITE_PUSHER_KEY, {
-    cluster: import.meta.env.VITE_PUSHER_CLUSTER,
-    authEndpoint: `${import.meta.env.VITE_API_URL}/api/pusher/auth`,
-    auth: {
-      headers: {
-        Authorization: `Bearer ${token.value}`,
-      },
-    },
-  });
+//   pusher = new window.Pusher(import.meta.env.VITE_PUSHER_KEY, {
+//     cluster: import.meta.env.VITE_PUSHER_CLUSTER,
+//     authEndpoint: `${import.meta.env.VITE_API_URL}/api/pusher/auth`,
+//     auth: {
+//       headers: {
+//         Authorization: `Bearer ${token.value}`,
+//       },
+//     },
+//   });
 
-  channel = pusher.subscribe(`private-user-${userId.value}`);
-  channel.bind("message.sent", (data) => {
-    const isFromCurrentFriend = data.from.id === parseInt(friendId.value);
+//   channel = pusher.subscribe(`private-user-${userId.value}`);
+//   channel.bind("message.sent", (data) => {
+//     const isFromCurrentFriend = data.from.id === parseInt(friendId.value);
 
-    if (isFromCurrentFriend) {
-      messages.value.push({
-        id: Date.now(),
-        ...data,
-      });
-      scrollToBottom();
-    }
-  });
-}
+//     if (isFromCurrentFriend) {
+//       messages.value.push({
+//         id: Date.now(),
+//         ...data,
+//       });
+//       scrollToBottom();
+//     }
+//   });
+// }
 
-onMounted(async () => {
-  if (!authStore.getUser && authStore.token) {
-    conversationStore.fetchConversations(friendId.value);
-  }
-
-  // await loadMessages();
-
-  if (!window.Pusher) {
-    const script = document.createElement("script");
-    script.src = "https://js.pusher.com/8.4.0/pusher.min.js";
-    script.onload = () => initPusher();
-    document.head.appendChild(script);
-  } else {
-    initPusher();
-  }
+onMounted(() => {
+  conversationStore.fetchConversations(friendId.value);
 });
 
 const messages = computed(() =>

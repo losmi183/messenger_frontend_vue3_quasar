@@ -15,10 +15,20 @@ export const useAuthStore = defineStore("auth", {
       this.token = token;
       localStorage.setItem("token", token);
     },
-    clearAuth() {
-      this.token = null;
-      this.user = null;
+    async clearAuth() {
+      // reset auth state
+      this.$reset();
       localStorage.removeItem("token");
+
+      // reset conversation store
+      const { useConversationStore } = await import("./conversations");
+      const conversationStore = useConversationStore();
+      conversationStore.resetStore();
+
+      // reset connection store
+      const { useConnectionsStore } = await import("./connections");
+      const connectionStore = useConnectionsStore();
+      connectionStore.resetStore();
     },
     login(email, password) {
       return api.post("/auth/login", { email, password }).then((res) => {
@@ -58,7 +68,7 @@ export const useAuthStore = defineStore("auth", {
             this.user = response.data;
           })
           .catch(() => {
-            this.clearSession();
+            this.clearAuth();
           });
       }
     },
