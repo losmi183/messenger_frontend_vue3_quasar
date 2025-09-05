@@ -93,6 +93,8 @@ function sendMessage() {
 
 onMounted(() => {
   conversationStore.fetchConversations(friendId.value);
+  conversationStore.setActiveConversation(friendId.value);
+  conversationStore.friendMessagesSeen(friendId.value);
 });
 
 const messages = computed(() =>
@@ -110,6 +112,9 @@ watch(
     friendId.value = newId;
     friendName.value = route.params.friendName;
     conversationStore.fetchConversations(newId);
+
+    conversationStore.setActiveConversation(newId);
+    conversationStore.friendMessagesSeen(friendId.value);
   }
 );
 watch(

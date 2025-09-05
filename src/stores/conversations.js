@@ -7,6 +7,8 @@ import { watch } from "vue";
 export const useConversationStore = defineStore("conversations", {
   state: () => ({
     conversations: {},
+    activeConversation: null, // trenutno otvoren friendId
+    newMessages: {},
     pusher: null,
     channel: null,
   }),
@@ -18,6 +20,13 @@ export const useConversationStore = defineStore("conversations", {
   },
 
   actions: {
+    setActiveConversation(friendId) {
+      this.activeConversation = friendId;
+      if (this.newMessages[friendId]) {
+        this.newMessages[friendId] = 0;
+      }
+    },
+
     sendMessage(friendId, content, user) {
       const tempId = Date.now(); // privremeni id
 
@@ -70,6 +79,18 @@ export const useConversationStore = defineStore("conversations", {
       }
     },
 
+    friendMessagesSeen(friendId) {
+      api
+        .post("/message/seen", {
+          friend_id: friendId,
+          seen: new Date().toISOString(),
+        })
+        .then((res) => {})
+        .catch((err) => {
+          console.error("Greška pri friendMessagesSeen:", err);
+        });
+    },
+
     async fetchConversations(friendId) {
       try {
         const res = await api.get(`/message/conversation/${friendId}`);
@@ -106,6 +127,13 @@ export const useConversationStore = defineStore("conversations", {
             message: data.message,
             created_at: data.created_at || new Date().toISOString(),
           });
+          // Ako poruka stiže za trenutno otvorenu konverzaciju ➝ ne dodaj u newMessages
+          if (this.activeConversation != friendId) {
+            // nova poruka za neaktivnog prijatelja
+            this.newMessages[friendId] = (this.newMessages[friendId] || 0) + 1;
+          } else {
+            this.friendMessagesSeen(friendId);
+          }
         });
       };
 

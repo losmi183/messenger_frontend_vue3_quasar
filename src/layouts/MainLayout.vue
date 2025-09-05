@@ -41,6 +41,18 @@
           <q-item-section>
             <q-item-label>{{ friend.name }}</q-item-label>
           </q-item-section>
+
+          <q-item-section
+            side
+            v-if="conversationStore.newMessages[friend.id] > 0"
+          >
+            <q-badge
+              color="red"
+              text-color="white"
+              :label="conversationStore.newMessages[friend.id]"
+              rounded
+            ></q-badge>
+          </q-item-section>
         </q-item>
       </q-list>
     </q-drawer>
@@ -52,12 +64,10 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
-import EssentialLink from "components/EssentialLink.vue";
+import { ref, onMounted, watch } from "vue";
 import { useAuthStore } from "stores/auth";
 import { useRouter } from "vue-router";
 import { useConnectionsStore } from "stores/connections";
-import { onMounted } from "vue";
 import { useConversationStore } from "stores/conversations";
 
 const auth = useAuthStore();
@@ -68,6 +78,19 @@ const conversationStore = useConversationStore();
 onMounted(() => {
   connections.loadConnections();
 });
+
+// 👇 prati kad se `connections.friends` promeni
+watch(
+  () => connections.friends,
+  (friends) => {
+    friends.forEach((friend) => {
+      if (friend.new_messages > 0) {
+        conversationStore.newMessages[friend.id] = friend.new_messages;
+      }
+    });
+  },
+  { immediate: true } // pokreni odmah i kad prvi put dođe vrednost
+);
 
 function logout() {
   auth.clearAuth();
