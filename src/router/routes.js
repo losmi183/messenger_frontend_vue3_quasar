@@ -21,9 +21,33 @@ const routes = [
   {
     path: "/conversation/:friendId/:friendName",
     component: () => import("layouts/MainLayout.vue"),
+    meta: { requiresAuth: true },
     children: [
       { path: "", component: () => import("pages/ConversationPage.vue") },
     ],
+  },
+
+  {
+    path: "/friends",
+    component: () => import("layouts/MainLayout.vue"),
+    meta: { requiresAuth: true },
+    children: [{ path: "", component: () => import("pages/FriendsPage.vue") }],
+  },
+
+  {
+    path: "/notifications",
+    component: () => import("layouts/MainLayout.vue"),
+    meta: { requiresAuth: true },
+    children: [
+      { path: "", component: () => import("pages/NotificationsPage.vue") },
+    ],
+  },
+
+  {
+    path: "/settings",
+    component: () => import("layouts/MainLayout.vue"),
+    meta: { requiresAuth: true },
+    children: [{ path: "", component: () => import("pages/SettingsPage.vue") }],
   },
 
   {

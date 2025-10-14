@@ -19,9 +19,9 @@ api.interceptors.request.use(
   }
 );
 
+export { api };
+
 export default boot(({ app }) => {
   app.config.globalProperties.$axios = axios;
   app.config.globalProperties.$api = api;
 });
-
-export { api };
