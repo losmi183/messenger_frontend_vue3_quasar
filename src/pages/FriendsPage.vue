@@ -50,7 +50,7 @@
     <q-input
       v-model="searchQuery"
       outlined
-      label="Search users by name (min 3 characters)"
+      label="Search users by name (min 2 characters)"
       class="q-mb-md"
       @update:model-value="onSearchInput"
     >
@@ -76,24 +76,19 @@
           </q-item-section>
           <q-item-section side>
             <q-btn
-              v-if="user.status === 'none'"
+              v-if="user.status === null"
               color="primary"
               label="Add Friend"
               @click="sendFriendRequest(user.user_id)"
               :loading="user.loading"
             />
-            <q-btn
-              v-else-if="user.status === 'pending_sent'"
-              color="grey"
-              label="Pending"
-              disable
-            />
-            <q-btn
-              v-else-if="user.status === 'pending_received'"
-              color="orange"
-              label="Respond"
-              disable
-            />
+            <q-chip
+              v-else
+              :color="user.status === 'PENDING' ? 'orange' : 'positive'"
+              text-color="white"
+            >
+              {{ user.status }}
+            </q-chip>
           </q-item-section>
         </q-item>
       </q-list>
@@ -101,7 +96,7 @@
 
     <div
       v-if="
-        searchQuery.length >= 3 && searchResults.length === 0 && !searchLoading
+        searchQuery.length >= 2 && searchResults.length === 0 && !searchLoading
       "
     >
       <p class="text-grey-6">No users found</p>
@@ -109,19 +104,20 @@
 
     <div
       v-if="
-        searchQuery.length < 3 &&
+        searchQuery.length < 2 &&
         searchResults.length === 0 &&
         receivedRequests.length === 0
       "
     >
-      <p class="text-grey-6">Type at least 3 characters to search for users</p>
+      <p class="text-grey-6">Type at least 2 characters to search for users</p>
     </div>
   </q-page>
 </template>
 
 <script>
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, computed } from "vue";
 import { useAuthStore } from "stores/auth";
+import { useConnectionsStore } from "stores/connections";
 import { api } from "../boot/axios";
 
 let searchTimeout = null;
@@ -131,32 +127,19 @@ export default defineComponent({
 
   setup() {
     const authStore = useAuthStore();
+    const connections = useConnectionsStore();
     const searchQuery = ref("");
     const searchResults = ref([]);
-    const receivedRequests = ref([]);
     const searchLoading = ref(false);
 
-    const loadReceivedRequests = () => {
-      api
-        .get("/connection/requested")
-        .then((response) => {
-          receivedRequests.value = response.data.map((request) => ({
-            ...request,
-            acceptLoading: false,
-            rejectLoading: false,
-          }));
-        })
-        .catch((error) => {
-          console.error("Error loading received requests:", error);
-        });
-    };
+    const receivedRequests = computed(() => connections.receivedRequests);
 
     const onSearchInput = (value) => {
       if (searchTimeout) {
         clearTimeout(searchTimeout);
       }
 
-      if (value.length < 3) {
+      if (value.length < 2) {
         searchResults.value = [];
         return;
       }
@@ -189,13 +172,13 @@ export default defineComponent({
       const user = searchResults.value.find((u) => u.user_id === userId);
       user.loading = true;
 
-      api
-        .post("/connection/initiate", { recipient_id: userId })
+      connections
+        .sendFriendRequest(userId)
         .then(() => {
-          user.status = "pending_sent";
+          user.status = "PENDING";
         })
-        .catch((error) => {
-          console.error("Error sending friend request:", error);
+        .catch(() => {
+          // Error već logovan u store
         })
         .finally(() => {
           user.loading = false;
@@ -203,49 +186,15 @@ export default defineComponent({
     };
 
     const acceptRequest = (connectionId) => {
-      const request = receivedRequests.value.find(
-        (r) => r.connection_id === connectionId
-      );
-      request.acceptLoading = true;
-
-      api
-        .post("/connection/accept", { connection_id: connectionId })
-        .then(() => {
-          receivedRequests.value = receivedRequests.value.filter(
-            (r) => r.connection_id !== connectionId
-          );
-        })
-        .catch((error) => {
-          console.error("Error accepting request:", error);
-        })
-        .finally(() => {
-          request.acceptLoading = false;
-        });
+      connections.acceptRequest(connectionId);
     };
 
     const rejectRequest = (connectionId) => {
-      const request = receivedRequests.value.find(
-        (r) => r.connection_id === connectionId
-      );
-      request.rejectLoading = true;
-
-      api
-        .post("/connection/reject", { connection_id: connectionId })
-        .then(() => {
-          receivedRequests.value = receivedRequests.value.filter(
-            (r) => r.connection_id !== connectionId
-          );
-        })
-        .catch((error) => {
-          console.error("Error rejecting request:", error);
-        })
-        .finally(() => {
-          request.rejectLoading = false;
-        });
+      connections.rejectRequest(connectionId);
     };
 
     onMounted(() => {
-      loadReceivedRequests();
+      connections.loadReceivedRequests();
     });
 
     return {

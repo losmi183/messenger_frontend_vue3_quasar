@@ -1,9 +1,11 @@
 // stores/conversations.js
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
+import { api } from "../boot/axios";
+import { useConnectionsStore } from "./connections";
 
 export const useConversationsStore = defineStore("conversations", () => {
-  // State - organizuje poruke po user ID-u
+  // State
   const conversations = ref({});
 
   // Getters
@@ -15,7 +17,6 @@ export const useConversationsStore = defineStore("conversations", () => {
 
   const getUnreadCount = computed(() => {
     return (userId) => {
-      // Broji poruke koje nisu od trenutnog korisnika i nisu označene kao pročitane
       const messages = conversations.value[userId] || [];
       return messages.filter(
         (msg) => !msg.isRead && msg.sender_id !== getCurrentUserId()
@@ -31,25 +32,21 @@ export const useConversationsStore = defineStore("conversations", () => {
     }));
   });
 
-  // Helper function - treba da se proslijedi iz auth store-a
+  // Helper function
   function getCurrentUserId() {
-    // Ovo će biti prosliješeno iz komponente
     return window._currentUserId || null;
   }
 
   // Actions
   function setMessagesForUser(userId, messages) {
-    // Postavlja sve poruke za korisnika (koristi se za učitavanje sa API-ja)
     conversations.value[userId] = [...messages];
   }
 
   function addMessageToUser(userId, message) {
-    // Dodaje jednu poruku za korisnika
     if (!conversations.value[userId]) {
       conversations.value[userId] = [];
     }
 
-    // Provjeri da poruka već ne postoji (da izbegne duplikate)
     const exists = conversations.value[userId].find(
       (msg) => msg.id === message.id
     );
@@ -59,13 +56,28 @@ export const useConversationsStore = defineStore("conversations", () => {
   }
 
   function markUserMessagesAsRead(userId, currentUserId) {
-    // Označava sve poruke od datog korisnika kao pročitane
     if (conversations.value[userId]) {
       conversations.value[userId] = conversations.value[userId].map((msg) => ({
         ...msg,
         isRead: msg.sender_id !== currentUserId ? true : msg.isRead,
       }));
     }
+  }
+
+  function markConversationAsSeen(friendId, currentUserId) {
+    return api
+      .post("/message/mark-as-seen", {
+        friend_id: friendId,
+      })
+      .then(() => {
+        markUserMessagesAsRead(friendId, currentUserId);
+        const connectionsStore = useConnectionsStore();
+        connectionsStore.resetNewMessages(friendId);
+      })
+      .catch((err) => {
+        console.error("Greška pri označavanju poruka:", err);
+        throw err;
+      });
   }
 
   function removeConversation(userId) {
@@ -89,6 +101,7 @@ export const useConversationsStore = defineStore("conversations", () => {
     setMessagesForUser,
     addMessageToUser,
     markUserMessagesAsRead,
+    markConversationAsSeen,
     removeConversation,
     clearAllConversations,
   };

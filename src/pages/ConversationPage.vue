@@ -59,6 +59,7 @@ import { ref, onMounted, watch, onUnmounted, nextTick, computed } from "vue";
 import { api } from "boot/axios";
 import FullScreenLoader from "components/FullScreenLoader.vue";
 import { useAuthStore } from "stores/auth";
+import { useConversationsStore } from "stores/conversations";
 
 const route = useRoute();
 const friendId = ref(route.params.friendId);
@@ -70,6 +71,7 @@ const loading = ref(false);
 const sending = ref(false);
 
 const authStore = useAuthStore();
+const conversations = useConversationsStore();
 const userId = computed(() => authStore.getUser?.id);
 const token = computed(() => authStore.token);
 
@@ -166,6 +168,9 @@ onMounted(async () => {
 
   await loadMessages();
 
+  // Samo jedan poziv!
+  conversations.markConversationAsSeen(friendId.value, userId.value);
+
   if (!window.Pusher) {
     const script = document.createElement("script");
     script.src = "https://js.pusher.com/8.4.0/pusher.min.js";
@@ -187,6 +192,8 @@ watch(
     friendId.value = newId;
     friendName.value = route.params.friendName;
     await loadMessages();
+
+    conversations.markConversationAsSeen(newId, userId.value);
   }
 );
 

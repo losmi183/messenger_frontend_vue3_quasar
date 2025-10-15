@@ -90,6 +90,9 @@
           <q-item-section>
             <q-item-label>{{ friend.name }}</q-item-label>
           </q-item-section>
+          <q-item-section side v-if="friend.new_messages > 0">
+            <q-badge color="red" :label="friend.new_messages" />
+          </q-item-section>
         </q-item>
       </q-list>
     </q-drawer>
