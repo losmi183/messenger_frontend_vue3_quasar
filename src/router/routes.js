@@ -62,6 +62,12 @@ const routes = [
   },
 
   {
+    path: "/crypt",
+    component: () => import("layouts/MainLayout.vue"),
+    children: [{ path: "", component: () => import("pages/CryptPage.vue") }],
+  },
+
+  {
     path: "/:catchAll(.*)*",
     component: () => import("pages/ErrorNotFound.vue"),
   },

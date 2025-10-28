@@ -4,219 +4,227 @@
 
     <q-card class="q-mb-md">
       <q-card-section>
-        <div class="text-h6">Profile</div>
+        <div class="teht-h6">Profile</div>
       </q-card-section>
 
       <q-separator />
 
       <q-card-section>
-        <q-input v-model="profile.name" label="Name" outlined class="q-mb-md" />
-        <q-input v-model="profile.email" label="Email" outlined disable />
+        <div class="q-mb-md">
+          <q-avatar size="100px" class="q-mb-md">
+            <img v-if="avatarPreview" :src="avatarPreview" />
+            <img v-else-if="currentAvatar" :src="currentAvatar" />
+            <div v-else class="bg-primary text-white text-h4">
+              {{ profile.name ? profile.name.charAt(0).toUpperCase() : "U" }}
+            </div>
+          </q-avatar>
 
-        <q-btn
-          color="primary"
-          label="Update Profile"
-          @click="updateProfile"
-          :loading="profileLoading"
-        />
+          <q-file
+            v-model="avatarFile"
+            label="Chose Avatar"
+            outlined
+            accept="image/*"
+            @update:model-value="onAvatarSelect"
+            class="q-mb-md"
+          >
+            <template v-slot:prepend>
+              <q-icon name="attach_file" />
+            </template>
+          </q-file>
+
+          <q-input
+            v-model="profile.name"
+            label="Name"
+            outlined=""
+            class="q-mb-md"
+            :rules="[(val) => !!val || 'Name is required']"
+          ></q-input>
+          <q-input
+            v-model="profile.email"
+            label="Email"
+            outlined
+            disabled
+            class="q-mb-md"
+          ></q-input>
+
+          <q-btn
+            color="primary"
+            label="Update Profile"
+            @click="updateProfile"
+            :loading="profileLoading"
+            :disable="!profile.name"
+          ></q-btn>
+        </div>
       </q-card-section>
-    </q-card>
-
-    <q-card class="q-mb-md">
-      <q-card-section>
-        <div class="text-h6">Change Password</div>
-      </q-card-section>
-
-      <q-separator />
 
       <q-card-section>
-        <q-input
-          v-model="password.current"
-          label="Current Password"
-          type="password"
-          outlined
-          class="q-mb-md"
-        />
-        <q-input
-          v-model="password.new"
-          label="New Password"
-          type="password"
-          outlined
-          class="q-mb-md"
-        />
-        <q-input
-          v-model="password.confirm"
-          label="Confirm New Password"
-          type="password"
-          outlined
-          class="q-mb-md"
-        />
-
-        <q-btn
-          color="primary"
-          label="Change Password"
-          @click="changePassword"
-          :loading="passwordLoading"
-        />
-      </q-card-section>
-    </q-card>
-
-    <q-card class="q-mb-md">
-      <q-card-section>
-        <div class="text-h6">Preferences</div>
+        <div class="teht-h6">Change Password</div>
       </q-card-section>
 
       <q-separator />
 
       <q-card-section>
-        <q-toggle
-          v-model="preferences.notifications"
-          label="Enable notifications"
-          class="q-mb-md"
-        />
-        <q-toggle
-          v-model="preferences.soundEnabled"
-          label="Enable sound"
-          class="q-mb-md"
-        />
-
-        <q-btn
-          color="primary"
-          label="Save Preferences"
-          @click="savePreferences"
-          :loading="preferencesLoading"
-        />
+        <div class="q-mb-md">
+          <q-input
+            v-model="password.new"
+            label="Password"
+            type="password"
+            outlined
+            class="q-mb-md"
+            :rules="[
+              (val) =>
+                !val ||
+                val.length >= 6 ||
+                'Password must be at least 6 characters',
+            ]"
+          />
+          <q-input
+            v-model="password.confirm"
+            label="Confirm New Password"
+            type="password"
+            outlined
+            class="q-mb-md"
+            :rules="[
+              (val) => !val || val === password.new || 'Passwords must match',
+            ]"
+          />
+          <q-btn
+            label="Change Password"
+            color="primary"
+            @click="changePassword"
+            :loading="passwordLoading"
+            :disable="!password.new || !password.confirm"
+          />
+        </div>
       </q-card-section>
     </q-card>
   </q-page>
 </template>
 
 <script>
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, computed, onMounted } from "vue";
 import { useAuthStore } from "stores/auth";
 import { api } from "../boot/axios";
-import { useQuasar } from "quasar";
+import { Notify } from "quasar";
 
 export default defineComponent({
-  name: "SettingsPage",
-
+  name: "SettingPage",
   setup() {
     const authStore = useAuthStore();
-    const $q = useQuasar();
+
+    const API_BASE_URL = import.meta.env.VITE_API_URL || api.defaults.baseURL;
+    const BASE_URL = API_BASE_URL.replace("/api", "");
+    const avatarFile = ref(null);
+    const avatarPreview = ref(null);
+    const profileLoading = ref(false);
+    const passwordLoading = ref(false);
 
     const profile = ref({
       name: "",
       email: "",
+      avatar: "",
     });
 
     const password = ref({
-      current: "",
       new: "",
       confirm: "",
     });
 
-    const preferences = ref({
-      notifications: true,
-      soundEnabled: true,
-    });
-
-    const profileLoading = ref(false);
-    const passwordLoading = ref(false);
-    const preferencesLoading = ref(false);
-
-    const loadSettings = () => {
-      if (authStore.user) {
-        profile.value.name = authStore.user.name;
-        profile.value.email = authStore.user.email;
-      }
-    };
-
-    const updateProfile = async () => {
-      profileLoading.value = true;
-      try {
-        const response = await api.put("/user/profile", {
-          name: profile.value.name,
-        });
-        authStore.user.name = profile.value.name;
-        $q.notify({
-          type: "positive",
-          message: "Profile updated successfully",
-        });
-      } catch (error) {
-        console.error("Error updating profile:", error);
-        $q.notify({
-          type: "negative",
-          message: "Error updating profile",
-        });
-      } finally {
-        profileLoading.value = false;
-      }
-    };
-
-    const changePassword = async () => {
-      if (password.value.new !== password.value.confirm) {
-        $q.notify({
-          type: "negative",
-          message: "Passwords do not match",
-        });
-        return;
-      }
-
-      passwordLoading.value = true;
-      try {
-        await api.put("/user/password", {
-          current_password: password.value.current,
-          new_password: password.value.new,
-        });
-        password.value = { current: "", new: "", confirm: "" };
-        $q.notify({
-          type: "positive",
-          message: "Password changed successfully",
-        });
-      } catch (error) {
-        console.error("Error changing password:", error);
-        $q.notify({
-          type: "negative",
-          message: "Error changing password",
-        });
-      } finally {
-        passwordLoading.value = false;
-      }
-    };
-
-    const savePreferences = async () => {
-      preferencesLoading.value = true;
-      try {
-        await api.put("/user/preferences", preferences.value);
-        $q.notify({
-          type: "positive",
-          message: "Preferences saved successfully",
-        });
-      } catch (error) {
-        console.error("Error saving preferences:", error);
-        $q.notify({
-          type: "negative",
-          message: "Error saving preferences",
-        });
-      } finally {
-        preferencesLoading.value = false;
-      }
-    };
-
     onMounted(() => {
-      loadSettings();
+      api
+        .get("http://messenger.test/api/auth/whoami")
+        .then((res) => {
+          console.log(res);
+          profile.value = res.data;
+        })
+        .catch((err) => {
+          alert(err);
+        });
     });
+
+    const currentAvatar = computed(() => {
+      if (!profile.value.avatar) return null;
+      return BASE_URL + profile.value.avatar;
+    });
+
+    const onAvatarSelect = (value) => {
+      let file = null;
+
+      if (Array.isArray(value)) {
+        if (value.length === 0) return;
+        file = value[0];
+      } else {
+        file = value;
+      }
+
+      if (!file) return;
+
+      avatarPreview.value = URL.createObjectURL(file);
+      console.log("Avatar selected:", file);
+    };
+
+    const updateProfile = () => {
+      const formData = new FormData();
+      formData.append("name", profile.value.name);
+
+      if (avatarFile.value) {
+        formData.append("avatar", avatarFile.value);
+      }
+
+      api
+        .post("/user/update", formData, {
+          headers: {
+            "Content-Type": "multipart-form-data",
+          },
+        })
+        .then((res) => {
+          console.log("Profile updated:", res.data);
+          Notify.create({
+            type: "positive",
+            message: "Profile updated successfully!",
+          });
+        })
+        .catch((err) => {
+          console.log(err);
+          Notify.create({
+            type: "negative",
+            message: "Error updating profile.",
+          });
+        });
+    };
+
+    const changePassword = () => {
+      api
+        .post("/user/change-password", {
+          password: password.value.new,
+          password2: password.value.confirm,
+        })
+        .then((res) => {
+          Notify.create({
+            type: "positive",
+            message: "Password updated successfully!",
+          });
+        })
+        .catch((err) => {
+          console.error(err);
+          Notify.create({
+            type: "negative",
+            message: "Error updating password.",
+          });
+        });
+    };
 
     return {
       profile,
       password,
-      preferences,
-      profileLoading,
-      passwordLoading,
-      preferencesLoading,
+      currentAvatar,
+      avatarFile,
+      avatarPreview,
+      onAvatarSelect,
       updateProfile,
       changePassword,
-      savePreferences,
+      profileLoading,
+      passwordLoading,
     };
   },
 });

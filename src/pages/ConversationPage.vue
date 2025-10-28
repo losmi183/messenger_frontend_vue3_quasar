@@ -3,14 +3,36 @@
     <FullScreenLoader :show="loading" />
 
     <!-- Header -->
-    <div class="chat-header q-pa-md">
-      <div class="text-h6">Conversation with: {{ friendName }}</div>
+    <div class="chat-header q-pa-md row items-center justify-between">
+      <div class="text-h6">
+        Conversation with: {{ friendName }}
+        <span class="text-caption text-grey"> (salt: {{ salt }})</span>
+      </div>
+
+      <div class="row items-center">
+        <q-input
+          v-model="passphrase"
+          :type="isLocked ? 'password' : 'text'"
+          :disable="isLocked"
+          label="Conversation password"
+          dense
+          outlined
+          class="q-mr-sm"
+          style="width: 220px"
+        />
+
+        <q-btn
+          :label="isLocked ? 'Change conversation password' : 'OK'"
+          :color="isLocked ? 'negative' : 'primary'"
+          @click="passphraseEntered"
+        />
+      </div>
     </div>
 
     <!-- Chat prozor sa fiksnom visinom -->
     <div ref="chatWindow" class="chat-window q-pa-sm">
       <div
-        v-for="msg in messages"
+        v-for="msg in displayMessages"
         :key="msg.id"
         class="q-mb-md"
         :class="msg.sender_id === userId ? 'sent' : 'received'"
@@ -60,15 +82,21 @@ import { api } from "boot/axios";
 import FullScreenLoader from "components/FullScreenLoader.vue";
 import { useAuthStore } from "stores/auth";
 import { useConversationsStore } from "stores/conversations";
+import CryptoJS from "crypto-js";
+import { encrypt, decrypt } from "src/utils/crypto";
 
 const route = useRoute();
 const friendId = ref(route.params.friendId);
 const friendName = ref(route.params.friendName);
+const salt = ref(null);
+const passphrase = ref(null);
 const messages = ref([]);
 const chatWindow = ref(null);
 const newMessage = ref("");
 const loading = ref(false);
 const sending = ref(false);
+const isLocked = ref(false);
+const displayMessages = ref([]);
 
 const authStore = useAuthStore();
 const conversations = useConversationsStore();
@@ -92,7 +120,8 @@ async function loadMessages() {
   loading.value = true;
   try {
     const res = await api.get(`/message/conversation/${friendId.value}`);
-    messages.value = res.data;
+    messages.value = res.data.messages;
+    salt.value = res.data.salt;
     scrollToBottom();
   } catch (err) {
     console.error("Greška prilikom učitavanja poruka:", err);
@@ -101,9 +130,38 @@ async function loadMessages() {
   }
 }
 
+function passphraseEntered() {
+  if (!isLocked.value) {
+    // Kliknuto "OK" — zaključavamo input i dešifrujemo poruke
+    isLocked.value = true;
+    try {
+      displayMessages.value = messages.value.map((msg) => {
+        const plainText = decrypt(msg.message, passphrase.value, salt.value);
+        return {
+          ...msg,
+          message: plainText || "[Nevažeća lozinka]",
+        };
+      });
+    } catch (e) {
+      displayMessages.value = messages.value.map((msg) => ({
+        ...msg,
+        message: "[Greška pri dekripciji]",
+      }));
+    }
+  } else {
+    // Kliknuto "Change password"
+    isLocked.value = false;
+    passphrase.value = "";
+    displayMessages.value = []; // brišemo prikaz dok se ne unese nova lozinka
+  }
+}
+
 // slanje poruke
 function sendMessage() {
-  const content = newMessage.value.trim();
+  const rawText = newMessage.value.trim();
+
+  const content = encrypt(rawText, passphrase.value, salt.value);
+
   if (!content || sending.value) return;
 
   sending.value = true;
@@ -114,12 +172,20 @@ function sendMessage() {
       content: content,
     })
     .then((res) => {
+      const date = new Date().toISOString();
       messages.value.push({
         id: res.data.id || Date.now(),
         sender_id: userId.value,
         sender_name: authStore.getUser.name,
         message: content,
-        created_at: res.data.created_at || new Date().toISOString(),
+        created_at: res.data.created_at || date,
+      });
+      displayMessages.value.push({
+        id: res.data.id || Date.now(),
+        sender_id: userId.value,
+        sender_name: authStore.getUser.name,
+        message: rawText,
+        created_at: res.data.created_at || date,
       });
       newMessage.value = "";
       scrollToBottom();
@@ -148,7 +214,6 @@ function initPusher() {
 
   channel = pusher.subscribe(`private-user-${userId.value}`);
   channel.bind("message.sent", (data) => {
-    debugger;
     const isFromCurrentFriend = data.from.id === parseInt(friendId.value);
 
     if (isFromCurrentFriend) {
@@ -156,8 +221,18 @@ function initPusher() {
         id: Date.now(),
         ...data,
       });
-      scrollToBottom();
     }
+
+    const plainText = decrypt(data.message, passphrase.value, salt.value);
+    displayMessages.value.push({
+      id: Date.now(),
+      sender_id: data.from.id,
+      sender_name: data.from.name,
+      message: plainText || "[Nevažeća lozinka]",
+      created_at: data.created_at || new Date().toISOString(),
+    });
+
+    scrollToBottom();
   });
 }
 
