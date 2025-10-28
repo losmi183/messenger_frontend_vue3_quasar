@@ -13,7 +13,7 @@ const routes = [
   },
   {
     path: "/register",
-    component: () => import("layouts/AuthLayout.vue"),
+    component: () => import("layouts/GuestLayout.vue"),
     meta: { guest: true },
     children: [{ path: "", component: () => import("pages/RegisterPage.vue") }],
   },
@@ -54,11 +54,6 @@ const routes = [
     path: "/message",
     component: () => import("layouts/MainLayout.vue"),
     children: [{ path: "", component: () => import("pages/MessagePage.vue") }],
-  },
-  {
-    path: "/msg",
-    component: () => import("layouts/MainLayout.vue"),
-    children: [{ path: "", component: () => import("pages/MsgPage.vue") }],
   },
 
   {
