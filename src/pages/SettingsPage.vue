@@ -132,7 +132,7 @@ export default defineComponent({
 
     onMounted(() => {
       api
-        .get("http://messenger.test/api/auth/whoami")
+        .get("/auth/whoami")
         .then((res) => {
           console.log(res);
           profile.value = res.data;

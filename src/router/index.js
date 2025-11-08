@@ -28,16 +28,34 @@ export default route(function (/* { store, ssrContext } */) {
   Router.beforeEach(async (to, from, next) => {
     const auth = useAuthStore();
 
+    // Uvek pokušaj da obnoviš sesiju (ako je već učitana, biće instant)
+    await auth.restoreSession();
+
+    const user = auth.getUser;
+
     // Ako store nema token, pokušaj restoreSession
     if (!auth.token) {
       await auth.restoreSession();
     }
-
     const isAuth = auth.isAuthencated;
 
-    if (to.meta.requiresAuth && !isAuth) next("/login");
-    else if (to.meta.guest && isAuth) next("/");
-    else next();
+    // Ako ruta zahteva admina, a korisnik nije admin → pošalji ga na početnu
+    if (to.meta.requiresAdmin && auth.user?.role !== "admin") {
+      return next("/");
+    }
+
+    // Ako ruta zahteva login, a korisnik nije ulogovan → login
+    if (to.meta.requiresAuth && !isAuth) {
+      return next("/login");
+    }
+
+    // Ako ruta je samo za goste (npr. login/register), a korisnik je već ulogovan → početna
+    if (to.meta.guest && isAuth) {
+      return next("/");
+    }
+
+    // Sve ostalo dozvoljeno
+    next();
   });
 
   return Router;

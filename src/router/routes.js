@@ -66,6 +66,40 @@ const routes = [
     path: "/:catchAll(.*)*",
     component: () => import("pages/ErrorNotFound.vue"),
   },
+
+  // ADMIN ROUTES
+  {
+    path: "/admin",
+    component: () => import("layouts/AdminLayout.vue"),
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: "dashboard",
+        component: () => import("pages/DashboardPage.vue"),
+      },
+      {
+        path: "users",
+        component: () => import("pages/UsersPage.vue"),
+      },
+      {
+        path: "requests",
+        component: () => import("pages/RequestsPage.vue"),
+      },
+      {
+        path: "messages",
+        component: () => import("pages/MessagesLogPage.vue"),
+      },
+      {
+        path: "settings",
+        component: () => import("pages/SettingsPage.vue"),
+      },
+      // preusmeri /admin -> /admin/dashboard
+      {
+        path: "",
+        redirect: "/admin/dashboard",
+      },
+    ],
+  },
 ];
 
 export default routes;
